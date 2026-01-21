@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Email Sender</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .container { max-width: 800px; margin-top: 50px; margin-bottom: 50px; }
+        .card { border: none; shadow: 0 4px 6px rgba(0,0,0,0.1); border-radius: 12px; }
+        .card-header { background-color: #4a90e2; color: white; border-radius: 12px 12px 0 0 !important; padding: 20px; }
+        .form-label { font-weight: 500; color: #333; }
+        .btn-primary { background-color: #4a90e2; border: none; padding: 10px 20px; font-weight: 500; }
+        .btn-primary:hover { background-color: #357abd; }
+        #statusArea { display: none; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card shadow-sm">
+        <div class="card-header text-center">
+            <h2 class="mb-0">Bulk Email Sender</h2>
+        </div>
+        <div class="card-body p-4">
+            <form id="emailForm">
+                
+                <h5 class="mb-3 text-secondary">SMTP Configuration</h5>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label for="smtp_server" class="form-label">SMTP Server</label>
+                        <input type="text" class="form-control" id="smtp_server" placeholder="smtp.gmail.com" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="smtp_port" class="form-label">Port</label>
+                        <input type="number" class="form-control" id="smtp_port" value="587" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="email_user" class="form-label">Your Email</label>
+                        <input type="email" class="form-control" id="email_user" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="email_password" class="form-label">App Password</label>
+                        <input type="password" class="form-control" id="email_password" placeholder="App Password (Not login password)" required>
+                        <div class="form-text">Use an "App Password" if using Gmail with 2FA.</div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <h5 class="mb-3 text-secondary">Recipients</h5>
+                <div class="mb-3">
+                    <label for="recipients" class="form-label">Email List (One per line)</label>
+                    <textarea class="form-control" id="recipients" rows="5" placeholder="user1@example.com&#10;user2@example.com" required></textarea>
+                </div>
+
+                <hr class="my-4">
+
+                <h5 class="mb-3 text-secondary">Message</h5>
+                <div class="mb-3">
+                    <label for="subject" class="form-label">Subject</label>
+                    <input type="text" class="form-control" id="subject" required>
+                </div>
+                <div class="mb-3">
+                    <label for="message" class="form-label">Body</label>
+                    <textarea class="form-control" id="message" rows="6" required></textarea>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg" id="sendBtn">Send Emails</button>
+                </div>
+            </form>
+
+            <div id="statusArea" class="alert alert-light border">
+                <h5 id="statusTitle">Sending...</h5>
+                <p id="statusText"></p>
+                <ul id="failedList" class="text-danger"></ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('emailForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const sendBtn = document.getElementById('sendBtn');
+    const statusArea = document.getElementById('statusArea');
+    const statusTitle = document.getElementById('statusTitle');
+    const statusText = document.getElementById('statusText');
+    const failedList = document.getElementById('failedList');
+
+    // UI Sending State
+    sendBtn.disabled = true;
+    sendBtn.innerText = "Sending...";
+    statusArea.style.display = 'block';
+    statusArea.className = 'alert alert-info';
+    statusTitle.innerText = "Processing...";
+    statusText.innerText = "Connecting to server and sending emails. Please wait.";
+    failedList.innerHTML = '';
+
+    const recipients = document.getElementById('recipients').value.split('\n').filter(e => e.trim());
+
+    const data = {
+        smtp_server: document.getElementById('smtp_server').value,
+        smtp_port: document.getElementById('smtp_port').value,
+        email_user: document.getElementById('email_user').value,
+        email_password: document.getElementById('email_password').value,
+        recipients: recipients,
+        subject: document.getElementById('subject').value,
+        message: document.getElementById('message').value
+    };
+
+    try {
+        const response = await fetch('/send', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            statusArea.className = 'alert alert-success';
+            statusTitle.innerText = "Completed";
+            statusText.innerText = `Sent: ${result.success_count} emails successfully.`;
+            
+            if (result.failed && result.failed.length > 0) {
+                statusArea.className = 'alert alert-warning';
+                statusText.innerText += " Some emails failed.";
+                result.failed.forEach(fail => {
+                    const li = document.createElement('li');
+                    li.innerText = fail;
+                    failedList.appendChild(li);
+                });
+            }
+        } else {
+            throw new Error(result.message || 'Unknown error');
+        }
+    } catch (error) {
+        statusArea.className = 'alert alert-danger';
+        statusTitle.innerText = "Error";
+        statusText.innerText = error.message;
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.innerText = "Send Emails";
+    }
+});
+</script>
+</body>
+</html>
